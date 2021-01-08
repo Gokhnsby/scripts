@@ -1,0 +1,78 @@
+#!/bin/sh
+
+#Backup all config and dump DB for CB#
+
+#cluster
+/usr/share/cb/cbcluster stop
+
+service cb-enterprise stop
+
+cd /cbdata/_backup/server_name
+#host file
+tar -P --selinux -cvf cbhosts.tar /etc/hosts
+#yum file
+tar -P --selinux -cvf cbyum.tar /etc/yum.repos.d
+#IP tables
+tar -P --selinux -cvf cbiptables.tar /etc/sysconfig/iptables
+#SSH config & keys
+tar -P --selinux -cvf cbssh.tar /etc/ssh/
+#tool config
+tar -P --selinux -cvf cbconfig.tar /etc/cb/
+#Rsyslog config
+tar -P --selinux -cvf cbrsyslog.tar /etc/rsyslog.conf
+#Rsyslog.d config
+tar -P --selinux -cvf cbrsyslogd.tar /etc/rsyslog.d/
+#RabbitMQ cookie
+tar -P --selinux -cvf cbrabbitmqcookie.tar /var/cb/
+#RabbitMQ node config
+tar -P --selinux -cvf cbrabbitmqnode.tar /var/cb/data/rabbitmq
+#SSH auth keys (depends on cluster env.)
+tar -P --selinux -cvf cbrootauthkeys.tar /root/.ssh/authorized_keys
+#Syslog format
+tar -P --selinux -cvf cbceftemp.tar /usr/share/cb/syslog_templates
+#installer for master
+tar -P --selinux -cvf cbinstallers.tar /usr/share/cb/coreservices/installers/
+
+#dump postgres DB
+pg_dump -C -Fp -f psqldump_config.sql cb -p 5002 \
+--exclude-table-data=allianceclient_comm_history \
+--exclude-table-data=allianceclient_uploads \
+--exclude-table-data=allianceclient_pending_uploads \
+--exclude-table-data=banning_sensor_counts \
+--exclude-table-data=binary_status \
+--exclude-table-data=cb_useractivity \
+--exclude-tabledata=detect_dashboard_average_alert_resolution_history \
+--exclude-table-data=detect_dashboard_binary_dwell_history \
+--exclude-table-data=detect_dashboard_host_hygiene_history \
+--exclude-table-data=investigations \
+--exclude-table-data=maintenance_job_history \
+--exclude-table-data=moduleinfo_events \
+--exclude-table-data=mutex_watchlist_searcher \
+--exclude-table-data=sensor_activity \
+--exclude-table-data=sensor_comm_failures \
+--exclude-table-data=sensor_driver_diagnostics \
+--exclude-table-data=sensor_event_diagnostics \
+--exclude-table-data=sensor_licensing_counts \
+--exclude-table-data=sensor_queued_data_stats \
+--exclude-table-data=sensor_resource_statuses \
+--exclude-table-data=server_storage_stats \
+--exclude-table-data=storefiles \
+--exclude-table-data=tagged_events
+pg_dumpall -p 5002 --roles-only -f psqlroles.sql
+
+#bakup Solr db
+tar -P --selinux -cvf cbsolr.tar /var/cb/data/solr5/
+#backup module
+tar -P --selinux -cvf cbmodulestore.tar /var/cb/data/modulestore/
+#for master 
+service pgsql start
+pg_dump -C -Fp -f psqldump_full.sql cb -p 5002
+pg_dumpall -p 5002 --roles-only -f psqlroles.sql
+service pgsql stop
+
+
+#start services
+#cluster
+/usr/share/cb/cbcluster start
+
+service cb-enterprise start
